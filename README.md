@@ -1,4 +1,4 @@
-# Google Tag Manager Template for TikTok Conversions API (server-side)
+# Google Tag Manager Template for Snapchat Conversions API (server-side)
 This template can be used in a S2S integration with Google Tag Manager. It uses the Snapchat Marketing API to send events directly to Snapchat.
 
 ## Getting started
