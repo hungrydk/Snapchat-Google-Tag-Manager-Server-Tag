@@ -1,6 +1,8 @@
 homepage: "https://github.com/hungrydk/Snapchat-Google-Tag-Manager-Server-Tag"
 documentation: "https://github.com/hungrydk/Snapchat-Google-Tag-Manager-Server-Tag"
 versions:
+  - sha: 1d81415edf6c90f5076fe55232b548eafdf5d9a4
+    changeNotes: Fixed permission settings
   - sha: 421f735d7818da3862cf0b96c88d9fabd22cccef
     changeNotes: Conversion tracking support for Snapchats Marketing API
 
