@@ -54,7 +54,6 @@ ___SANDBOXED_JS_FOR_SERVER___
 const templateDataStorage = require('templateDataStorage');
 const setResponseBody = require('setResponseBody');
 const setResponseStatus = require('setResponseStatus');
-const logToConsole = require('logToConsole');
 const setResponseHeader = require('setResponseHeader');
 const getTimestampMillis = require('getTimestampMillis');
 const sendHttpRequest = require('sendHttpRequest');
@@ -64,7 +63,7 @@ const sha256Sync = require('sha256Sync');
 
 
 const tokenTemplateStorageKey = "accessToken";
-const saveAccessToken = (token) => templateDataStorage.setItemCopy(tokenTemplateStorageKey, accessToken);
+const saveAccessToken = (token) => templateDataStorage.setItemCopy(tokenTemplateStorageKey, token);
 const getAccessToken = () => templateDataStorage.getItemCopy(tokenTemplateStorageKey);
 
 function isAlreadyHashed(input){
@@ -106,10 +105,10 @@ const refreshAccessToken = (callback) => {
   postBody += "&client_secret=" + data.client_secret;
   postBody += "&grant_type=refresh_token";
 
-  logToConsole("Refreshing access token...");
+
   sendHttpRequest('https://accounts.snapchat.com/login/oauth2/access_token', (statusCode, headers, body) => {
     const parsedBody = JSON.parse(body);
-    if (statusCode == 200) {
+    if (statusCode >= 200 && statusCode <= 300 && parsedBody.access_token) {
       callback(parsedBody.access_token);
     }
   }, {headers: {'Content-Type': 'application/x-www-form-urlencoded'}, method: 'POST', timeout: 500}, postBody);
@@ -118,57 +117,31 @@ const refreshAccessToken = (callback) => {
 
 let attempts = 0;
 // HTTP Request sent to snapchat to trigger a conversion
-const purchaseConversion = (access_token, requestBody, onSuccess, onFailure) => {
-  logToConsole("Sending purchase conversion event", data);
+const purchaseConversion = (access_token, requestBody) => {
   sendHttpRequest('https://tr.snapchat.com/v2/conversion', (statusCode, headers, body) => {
-    logToConsole("Response from snapchat conversion api", statusCode);
     if (statusCode >= 200 && statusCode <= 300) {
-      onSuccess(body.access_token);
+      data.gtmOnSuccess();
     } else {
-      // If request failed with 401 we refresh the token and try again. This could potentially happen multiple times, if two tag instances tries to refresh the access token at the same time.
-      if (statusCode == 401) {
-        // Make sure to exit if request continously fails.
-        if (attempts >= 3) {
-          setResponseStatus(statusCode);
-          setResponseBody(body);
-
-          onFailure();
-          return;
-        }
-
-        attempts += 1;
-        refreshAccessToken((new_access_token) => {
-          saveAccessToken(new_access_token);
-          purchaseConversion(new_access_token, data, onSuccess, onFailure);
-        });
-      } else {
-        logToConsole("Failed purchase conversion");
-        setResponseStatus(statusCode);
-        setResponseBody(body);
-
-        onFailure();
-      }
+      data.gtmOnFailure();
     }
   }, {headers: {
     'Content-Type': 'application/json',
     'Authorization': 'Bearer ' + access_token,
-  }, method: 'POST', timeout: 500}, requestBody);
+  }, method: 'POST', timeout: 2000}, requestBody);
 };
 
 
 // Use access token from storage.
-let accessToken = getAccessToken();
+const accessToken = getAccessToken();
 
 if (accessToken) {
   // If access token is available, call the purchase conversion api.
-  logToConsole("Using access token from template storage");
-  purchaseConversion(accessToken, snapchatPurchaseConversionPayload, data.gtmOnSuccess, data.gtmOnFailure);
+  purchaseConversion(accessToken, snapchatPurchaseConversionPayload);
 } else {
   // If no access token is available, aquire a new one.
   refreshAccessToken((new_access_token) => {
-    logToConsole("Access token refreshed", new_access_token);
     saveAccessToken(new_access_token);
-    purchaseConversion(new_access_token, snapchatPurchaseConversionPayload, data.gtmOnSuccess, data.gtmOnFailure);
+    purchaseConversion(new_access_token, snapchatPurchaseConversionPayload);
   });
 }
 
@@ -227,26 +200,21 @@ ___SERVER_PERMISSIONS___
             "type": 1,
             "string": "specific"
           }
-        }
-      ]
-    },
-    "clientAnnotations": {
-      "isEditedByUser": true
-    },
-    "isRequired": true
-  },
-  {
-    "instance": {
-      "key": {
-        "publicId": "logging",
-        "versionId": "1"
-      },
-      "param": [
+        },
         {
-          "key": "environments",
+          "key": "urls",
           "value": {
-            "type": 1,
-            "string": "debug"
+            "type": 2,
+            "listItem": [
+              {
+                "type": 1,
+                "string": "https://tr.snapchat.com/v2/*"
+              },
+              {
+                "type": 1,
+                "string": "https://accounts.snapchat.com/login/oauth2/access_token"
+              }
+            ]
           }
         }
       ]
@@ -298,6 +266,5 @@ scenarios:
 
 ___NOTES___
 
-Created on 13/07/2021, 10:16:12
-
+Created on 14/07/2021, 12:26:21
 
